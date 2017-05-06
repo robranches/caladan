@@ -1,5 +1,5 @@
 ---
-title: "Machine Learnin course"
+title: "Machine Learning course"
 author: "Rob Ranches"
 date: "5 de maio de 2017"
 output: html_document
@@ -57,7 +57,7 @@ The expected value of the out-of-sample error will correspond to the expected nu
 
 6.Test the model against testing data set
 
-7.Run the model with 20 observations to estimate
+7.Run the model with pml-test
 
 
 ## 1. Loading data
@@ -127,7 +127,7 @@ testingCl <- testingCl[!(NArate>0.95)]
 testingPC <- predict(preProc,testingCl[,1:52])
 confusionMatrix(testingCl$classe,predict(modFitRF,testingPC))
 ```
-## 7.Run the model with 20 observations to estimate
+## 7.Run the model with pml-test
 ```{r cvtm2}
 testdata <- read.csv("pml-testing.csv")
 testdataCl <- testdata[,-Cl]
