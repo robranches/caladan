@@ -1,0 +1,145 @@
+---
+title: "Machine Learnin course"
+author: "Rob Ranches"
+date: "5 de maio de 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(randomForest)
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+```
+
+#Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+Data for the project is provided at different websites proposed in the exercise.
+
+#Premisses
+##Reproducibility
+Set the exercise random seed at 1111. In order to reproduce the results below, also use the libraries:
+library(caret)
+
+library(randomForest)
+
+library(rattle)
+
+library(rpart.plot)
+
+library(RColorBrewer)
+
+
+##The model
+The outcome is "classe", a factor with 5 levels, class A up to class E, where Class A is the right execution of the exercise, while the other 4 classes correspond to common mistakes.
+Prediction evaluations will be based on maximizing the accuracy and minimizing the out-of-sample error.
+Two models will be constructed using decision trees and random forest algorithms, and the one with best accuracy will be selected
+
+##Cross-validation
+Cross-validation will be performed subsampling our data set in 70% vs. 30% respectively for training set / test sets.
+
+##Expected out-of-sample error
+The expected value of the out-of-sample error will correspond to the expected number of missclassified observations/total observations in the Test data set, which is the quantity: 1-accuracy found from the cross-validation data set,
+
+#Steps for Analysis
+1.Load the data set, transform if necessary and discover data patterns
+
+2.Use cross-validation to built a model; 70% for  training data set, 30% of the data for testing data
+
+3.Clean the data by excluding variables which apparently not explanatory and reduce variables with few usefull information.
+
+4.Use Principal component analysis to find the optimum variables
+
+5.Use random forest method to create a new model vs. decision tree
+
+6.Test the model against testing data set
+
+7.Run the model with 20 observations to estimate
+
+
+## 1. Loading data
+```{r lendo, results="hide"}
+data <- read.csv("pml-training.csv")
+colnames(data)
+summary(data)
+```
+## 2.0 Cross validation - 70% of training data
+
+```{r cvetapa1}
+
+set.seed(1111)
+train <- createDataPartition(y=data$classe,p=.70,list=F)
+training <- data[train,]
+testing <- data[-train,]
+```
+## 3.0 Data Quality
+
+```{r cveclean, results="hide"}
+#exclude columns unfit
+Cl <- grep("name|timestamp|window|X", colnames(training), value=F) 
+trainingCl <- training[,-Cl]
+#exclude variable with over 95%
+trainingCl[trainingCl==""] <- NA
+NArate <- apply(trainingCl, 2, function(x) sum(is.na(x)))/nrow(trainingCl)
+trainingCl <- trainingCl[!(NArate>0.95)]
+summary(trainingCl)
+```
+## 4. Use Principal component analysis to find the optimum variables
+We have found massive number of variables, so we must apply PCA to reduce them.
+
+```{r cvclean2, results="hide"}
+preProc <- preProcess(trainingCl[,1:52],method="pca",thresh=.8) 
+preProc <- preProcess(trainingCl[,1:52],method="pca",thresh=.9)
+preProc <- preProcess(trainingCl[,1:52],method="pca",thresh=.95)
+preProc <- preProcess(trainingCl[,1:52],method="pca",pcaComp=25) 
+preProc$rotation
+trainingPC <- predict(preProc,trainingCl[,1:52])
+```
+## 5.Use random forest method to create a new model vs. Decision Tree
+```{r cvrd1}
+modFitRF <- randomForest(trainingCl$classe ~ .,   data=trainingPC, do.trace=F)
+print(modFitRF)
+importance(modFitRF)
+modFitA1 <- rpart(trainingCl$classe ~ ., data=trainingPC, method="class")
+fancyRpartPlot(modFitA1)
+
+model1 <- rpart(trainingCl$classe ~ ., data=trainingPC, method="class")
+prediction1 <- predict(model1, trainingPC, type = "class")
+rpart.plot(model1, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+
+
+
+
+
+
+
+## 6.Test the model against testing data set
+```{r cvtm1}
+testingCl <- testing[,-Cl]
+testingCl[testingCl==""] <- NA
+NArate <- apply(testingCl, 2, function(x) sum(is.na(x)))/nrow(testingCl)
+testingCl <- testingCl[!(NArate>0.95)]
+testingPC <- predict(preProc,testingCl[,1:52])
+confusionMatrix(testingCl$classe,predict(modFitRF,testingPC))
+```
+## 7.Run the model with 20 observations to estimate
+```{r cvtm2}
+testdata <- read.csv("pml-testing.csv")
+testdataCl <- testdata[,-Cl]
+testdataCl[testdataCl==""] <- NA
+NArate <- apply(testdataCl, 2, function(x) sum(is.na(x)))/nrow(testdataCl)
+testdataCl <- testdataCl[!(NArate>0.95)]
+testdataPC <- predict(preProc,testdataCl[,1:52])
+testdataCl$classe <- predict(modFitRF,testdataPC)
+```
+# Analysis
+
+19662 observations, 70% (13737) used in random forest model, 30% - 5885 observations use for cross validation
+The decision to use Random Forest over Decision Trees was so, that accuracy for Random Forest model was 0.995 (95% CI: (0.993, 0.997)) compared to Decision Tree model with 0.739 (95% CI: (0.727, 0.752)). 
+The Random Forests model was choosen. The expected out-of-sample error is estimated at 0.005, or 0.5%.
+Tests were conducted with a young population, test results are subject to change with different ages, the model expects to perform over 95% observed these conditions.
